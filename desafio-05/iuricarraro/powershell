@@ -1,0 +1,133 @@
+function desafio5
+{
+    Param
+    (
+        [Parameter(Mandatory=$true)]
+        [ValidateScript({Test-Path -Path $_ })]
+        [String] $fileJSON
+    )
+
+    $oJson = Get-Content $fileJSON -Encoding UTF8 | ConvertFrom-Json;
+
+    # necessário para mais de uma questão
+    $gruposFuncionariosByArea = $oJson.funcionarios | Group-Object { $_.area };
+
+    # questão 1
+    $funcionarioMaiorSalario = [decimal]::MinValue;
+    $funcionarioMenorSalario = [decimal]::MaxValue;
+    [decimal] $maiorSalario = [decimal]::MinValue;
+    [decimal] $menorSalario = [decimal]::MaxValue;
+    [decimal] $mediaSalarial = 0;
+    foreach($funcionario in $oJson.funcionarios)
+    {
+        $salario = [decimal] ($funcionario.salario -replace ',','.');
+
+        if($salario -ge $maiorSalario)
+        {
+            $maiorSalario = $salario;
+            $funcionarioMaiorSalario = $funcionario;
+        }
+        if($salario -le $menorSalario)
+        {
+            $menorSalario = $salario;
+            $funcionarioMenorSalario = $funcionario;
+        }
+
+        $mediaSalarial += $salario;
+    }
+
+    # definido o maior salario, busca todos os funcionarios com este salario
+    foreach($funcionariosMaiorSalario in ($oJson.funcionarios | Where-Object { $_.salario -eq $funcionarioMaiorSalario.salario }))
+    {
+        Write-Output("global_max|{0} {1}|{2}" -f $funcionariosMaiorSalario.nome, $funcionariosMaiorSalario.sobrenome, (formataValor($funcionariosMaiorSalario.salario)));
+    }
+
+    # definido o menor salario, busca todos os funcionarios com este salario
+    foreach($funcionariosMenorSalario in ($oJson.funcionarios | Where-Object { $_.salario -eq $funcionarioMenorSalario.salario }))
+    {
+        Write-Output("global_min|{0} {1}|{2}" -f $funcionariosMenorSalario.nome, $funcionariosMenorSalario.sobrenome, (formataValor($funcionariosMenorSalario.salario)));
+    }
+
+    Write-Host ("global_avg|{0}" -f (formataValor(($mediaSalarial/$oJson.funcionarios.Count))));
+
+    # questão 2
+    foreach($grupoFuncionariosByArea in $gruposFuncionariosByArea)
+    {
+        $maiorSalario = [decimal]::MinValue;
+        $menorSalario = [decimal]::MaxValue;
+        $mediaSalarial = 0;
+
+        foreach($funcionario in $grupoFuncionariosByArea.Group)
+        {
+            $salario = [decimal] ($funcionario.salario -replace ',','.');
+
+            if($salario -ge $maiorSalario)
+            {
+                $maiorSalario = $salario;
+            }
+            if($salario -le $menorSalario)
+            {
+                $menorSalario = $salario;
+            }
+
+            $mediaSalarial += $salario;
+        }
+
+        # definido o maior salario da area, busca todos os funcionarios desta area com este salario
+        foreach($funcionariosMaiorSalarioPorArea in ($grupoFuncionariosByArea.Group | Where-Object { $_.salario -eq $maiorSalario }))
+        {
+            Write-Output("area_max|{0}|{1} {2}|{3}" -f ($oJson.areas | Where-Object { $_.codigo -eq $funcionariosMaiorSalarioPorArea.area }).nome, $funcionariosMaiorSalarioPorArea.nome, $funcionariosMaiorSalarioPorArea.sobrenome, (formataValor($funcionariosMaiorSalarioPorArea.salario)));
+        }
+
+        # definido o maior salario da area, busca todos os funcionarios desta area com este salario
+        foreach($funcionariosMenorSalarioPorArea in ($grupoFuncionariosByArea.Group | Where-Object { $_.salario -eq $menorSalario }))
+        {
+            Write-Output("area_min|{0}|{1} {2}|{3}" -f ($oJson.areas | Where-Object { $_.codigo -eq $funcionariosMenorSalarioPorArea.area }).nome, $funcionariosMenorSalarioPorArea.nome, $funcionariosMenorSalarioPorArea.sobrenome, (formataValor($funcionariosMenorSalarioPorArea.salario)));
+        }
+
+        Write-Output("area_avg|{0}|{1}" -f ($oJson.areas | Where-Object { $_.codigo -eq $grupoFuncionariosByArea.Name }).nome, (formataValor(($mediaSalarial/$grupoFuncionariosByArea.Count))));
+    }
+
+
+    # questão 3
+    # get last element
+    foreach($mostEmployees in $gruposFuncionariosByArea[-1])
+    {
+        Write-Output("most_employees|{0}|{1}" -f ($oJson.areas | Where-Object { $_.codigo -eq $mostEmployees.Name }).nome, $mostEmployees.Count);
+    }
+
+    # get first element
+    foreach($leastEmployees in $gruposFuncionariosByArea[0])
+    {
+        Write-Output("least_employees|{0}|{1}" -f ($oJson.areas | Where-Object { $_.codigo -eq $leastEmployees.Name }).nome, $leastEmployees.Count);
+    }
+
+    # questão 4
+    # procura o maior salario entre os funcionarios com mesmo sobrenome
+    $gruposFunctionariosByMesmoSobrenomes = $oJson.funcionarios | Group-Object { $_.sobrenome } | Where-Object { $_.Count -gt 1 };
+    foreach($grupoFuncionariosByMesmoSobrenomes in $gruposFunctionariosByMesmoSobrenomes)
+    {
+        $maiorSalario = [decimal]::MinValue;
+        foreach($funcionariosMesmoSobrenome in $grupoFuncionariosByMesmoSobrenomes.Group)
+        {
+            $salario = [decimal] ($funcionariosMesmoSobrenome.salario -replace ',','.');
+
+            if($salario -ge $maiorSalario)
+            {
+                $maiorSalario = $salario;
+            }
+        }
+
+        foreach($funcionarioByMaiorSalario in ($grupoFuncionariosByMesmoSobrenomes.Group | Group-Object { $_.salario -eq $maiorSalario })[0].Group)
+        {
+            Write-Output("last_name_max|{1}|{0} {1}|{2}" -f $funcionarioByMaiorSalario.nome, $funcionarioByMaiorSalario.sobrenome, (formataValor($funcionarioByMaiorSalario.salario)));
+        }
+    }
+}
+
+function formataValor($salario)
+{
+    return (("{0:N2}" -f $salario) -replace '\.','') -replace ',','.';
+}
+
+desafio5 $args[0];
